@@ -1,0 +1,120 @@
+---
+- hosts: oracledb
+  remote_user: root
+  become_user: root
+  become_method: sudo
+  tasks:
+     - name: Update /etc/hosts from inventory
+       lineinfile: dest=/etc/hosts regexp='.*{{item}}$' line='{{hostvars[item].ansible_default_ipv4.address}} {{item}}' state=present
+       with_items: '{{groups.all}}'
+       become: true
+
+     - name: Create Disk Partion
+       parted:
+         device: /dev/sdb
+         number: 1
+         flags: [ lvm ]
+         state: present
+       become: true
+
+     - name: Format Partition
+       filesystem:
+          fstype: xfs
+          dev: /dev/sdb1
+       become: true
+
+     - name: Mount the Partition
+       mount:
+          fstype: xfs
+          src: /dev/sdb1
+          path: /u01/
+          state: mounted
+       become: true
+
+     - name: download pre-reqs
+       get_url:
+         url: https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracle-database-preinstall-18c-1.0-1.el7.x86_64.rpm
+         dest: /tmp/
+       become: true
+
+     - name: install pre-reqs rpm
+       yum:
+         name: /tmp/oracle-database-preinstall-18c-1.0-1.el7.x86_64.rpm
+         state: present
+       become: true
+
+     - name: provide permission to create folder /u01
+       command: chown -R oracle:oinstall /u01/
+       become: true
+
+     - name: Create directories
+       shell: |
+         mkdir -p /u01/app/oraInventory
+         mkdir -p /u01/app/oracle/product/19.2.0/dbhome_1
+         chown -R oracle:oinstall /u01/app/oraInventory
+         chown -R oracle:oinstall /u01/app/oracle
+       become: true
+     
+     - name: Unzip software to location
+       unarchive:
+         src: V981623-01.zip
+         dest: /u01/app/oracle/product/19.2.0/dbhome_1/
+         group: oinstall
+         owner: oracle
+         force: no
+       become: true
+
+     - name: copy database response file
+       copy:
+         src: db_install.rsp
+         group: oinstall
+         owner: oracle
+         dest: /tmp
+       become: true
+     
+     - name: Run Installer in silent mode
+       shell: |
+         sudo chmod 777 /u01/app/oracle/product/19.2.0/dbhome_1/runInstaller
+         export ORACLE_HOME=/u01/app/oracle/product/19.2.0/dbhome_1
+         sudo su - oracle -c "/u01/app/oracle/product/19.2.0/dbhome_1/runInstaller -silent -responseFile /tmp/db_install.rsp"
+       register: outputlog
+       become_method: sudo
+       become_user: oracle
+       ignore_errors: true
+     
+     - debug: var=outputlog.stdout_lines
+       ignore_errors: true
+       
+     - name: Run root.sh
+       shell: |
+         /u01/app/oraInventory/orainstRoot.sh
+         /u01/app/oracle/product/19.2.0/dbhome_1/root.sh
+       register: rootshoutput
+       become: true
+       
+     - debug: var=rootshoutput.stdout_lines
+       ignore_errors: true
+     
+     - name: Running DBCA config
+       shell: |
+         export ORACLE_HOME=/u01/app/oracle/product/19.2.0/dbhome_1
+         sudo su - oracle -c "/u01/app/oracle/product/19.2.0/dbhome_1/runInstaller -executeConfigTools -responseFile /tmp/db_install.rsp -silent"
+       register: dbcaoutput
+       become_method: sudo
+       become_user: oracle
+       ignore_errors: true
+       
+     - debug: var=dbcaoutput.stdout_lines
+       ignore_errors: true
+       
+     - name: Running DBCA config
+       shell: |
+         export ORACLE_HOME=/u01/app/oracle/product/19.2.0/dbhome_1
+         sudo su - oracle -c "/u01/app/oracle/product/19.2.0/dbhome_1/runInstaller -executeConfigTools -responseFile /tmp/db_install.rsp -silent"
+       register: dbcaoutput
+       become_method: sudo
+       become_user: oracle
+       ignore_errors: true
+       
+     - debug: var=dbcaoutput.stdout_lines
+       ignore_errors: true

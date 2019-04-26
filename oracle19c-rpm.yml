@@ -1,0 +1,67 @@
+---
+- hosts: oracledb18c
+  remote_user: root
+  become_user: root
+  become_method: sudo
+  tasks:
+     - name: Update /etc/hosts from inventory
+       lineinfile: dest=/etc/hosts regexp='.*{{item}}$' line='{{hostvars[item].ansible_default_ipv4.address}} {{item}}' state=present
+       with_items: '{{groups.all}}'
+       become: true
+
+     - name: Create Disk Partion
+       parted:
+         device: /dev/sdb
+         number: 1
+         flags: [ lvm ]
+         state: present
+       become: true
+
+     - name: Format Partition
+       filesystem:
+          fstype: xfs
+          dev: /dev/sdb1
+       become: true
+
+     - name: Mount the Partition
+       mount:
+          fstype: xfs
+          src: /dev/sdb1
+          path: /opt/oracle/oradata
+          state: mounted
+       become: true
+
+     - name: copy rpm file to server
+       copy:
+         src: oracle-database-ee-18c-1.0-1.x86_64.rpm
+         dest: /opt/oracle/oradata/oracle-database-ee-18c-1.0-1.x86_64.rpm
+         force: no
+       become: true
+
+     - name: download pre-reqs
+       get_url:
+         url: https://yum.oracle.com/repo/OracleLinux/OL7/latest/x86_64/getPackage/oracle-database-preinstall-19c-1.0-1.el7.x86_64.rpm
+         dest: /opt/oracle/oradata/
+       become: true
+
+     - name: install pre-reqs rpm
+       yum:
+         name: /opt/oracle/oradata/oracle-database-preinstall-18c-1.0-1.el7.x86_64.rpm
+         state: present
+       become: true
+
+     - name: provide permission to create folder /opt/oracle
+       command: chown -R oracle:oinstall /opt/oracle/
+       become: true
+
+     - name: install oracle database software rpm
+       yum:
+         name: /opt/oracle/oradata/oracle-database-ee-19c-1.0-1.x86_64.rpm
+         state: present
+       become: true
+
+     - name: create database using configure script
+       shell: |
+         chown -R oracle:oinstall /opt/oracle/oradata
+         /etc/init.d/oracledb_ORCLCDB-19c configure
+       become: true
