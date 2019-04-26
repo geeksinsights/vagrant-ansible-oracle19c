@@ -33,8 +33,8 @@
 
      - name: copy rpm file to server
        copy:
-         src: oracle-database-ee-18c-1.0-1.x86_64.rpm
-         dest: /opt/oracle/oradata/oracle-database-ee-18c-1.0-1.x86_64.rpm
+         src: oracle-database-ee-19c-1.0-1.x86_64.rpm
+         dest: /opt/oracle/oradata/oracle-database-ee-19c-1.0-1.x86_64.rpm
          force: no
        become: true
 
@@ -46,7 +46,7 @@
 
      - name: install pre-reqs rpm
        yum:
-         name: /opt/oracle/oradata/oracle-database-preinstall-18c-1.0-1.el7.x86_64.rpm
+         name: /opt/oracle/oradata/oracle-database-preinstall-19c-1.0-1.el7.x86_64.rpm
          state: present
        become: true
 
